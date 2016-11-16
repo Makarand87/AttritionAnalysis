@@ -86,7 +86,7 @@ test <- subset(dataset, sample==FALSE); nrow(test)
 
 
 logit1 <- glm(Attrition ~ ExperienceInAGS + EmployeeAge+ Shift + 
-                MaritalStatus + TransportMode + WorkLocation + JobRole + 
+                MaritalState + TransportMode + WorkLocation + JobRole + 
                 ExperienceType + ProdAvgDuringNotice + QualAvgDuringNotice + 
                 Course + Function + Shift_Name + Gender, 
               family=binomial, data = train); 
