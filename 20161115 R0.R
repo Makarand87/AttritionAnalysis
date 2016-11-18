@@ -32,8 +32,41 @@ dataset$GenderStatus <- ifelse(dataset$Gender == 'Male', 1, 0)
 summary(dataset)
 
 
+library(Hmisc)
+describe(dataset)
+library(fBasics)
+basicStats(dataset$Attrition, ci=0.95)
 
-########### 3. Data Exploration ############
+kurtosis(dataset[c("MaritalState" , "ExperienceInAGS", "QualAvgDuringNotice", "Last30DaysLeaveCount", "TotalExtraHoursWorked")])
+skewness(dataset[c("MaritalState" , "ExperienceInAGS", "QualAvgDuringNotice", "Last30DaysLeaveCount", "TotalExtraHoursWorked")])
+
+library(descr)
+
+CrossTable(dataset$MaritalStatus, dataset$Availability_Filter, expected = TRUE)
+
+chisq.test(table(dataset$MaritalStatus, dataset$Attrition))
+
+chisq.test(table(dataset$Gender, dataset$Availability_Filter))
+CrossTable(dataset$Course, dataset$Availability_Filter)
+chisq.test(table(dataset$Course, dataset$Availability_Filter),simulate.p.value = TRUE)
+str(dataset$ExperienceInAGS)
+
+
+
+# Toooooooooo Severe for the system
+# fisher.test(dataset$Course, dataset$Availability_Filter,simulate.p.value=TRUE, B=1e7)
+
+
+
+### Strength of Association
+library(cramer)
+# Toooooooooo Severe for the system
+cramer.test(dataset$ExperienceInAGS, dataset$Attrition)
+
+library(vcd)
+assocstats(table(dataset$MaritalStatus, dataset$Attrition))
+
+TRUE########### 3. Data Exploration ############
 # cor(dataset$Shift, dataset$Shift_Name)
 tapply(dataset$Attrition, dataset$Experience.Range, sum)
 
@@ -71,12 +104,11 @@ cor(dataset$QualAvgDuringNotice, dataset$ProdAvgDuringNotice)
 
 
 ########### 4. Logistic #####################
-names(dataset)
-
-
+### Base Table Accuracy ###########
 base <- table(dataset$Attrition);base
 BaselineAccu =  base[[2]]*100/nrow(dataset);BaselineAccu
 
+### Training and Testing Dataset ###########
 library(caTools)
 
 set.seed(100)
@@ -85,10 +117,10 @@ train <- subset(dataset, sample==TRUE); nrow(train)
 test <- subset(dataset, sample==FALSE); nrow(test) 
 
 
-logit1 <- glm(Attrition ~ ExperienceInAGS + EmployeeAge+ Shift + 
-                MaritalState + TransportMode + WorkLocation + JobRole + 
-                ExperienceType + ProdAvgDuringNotice + QualAvgDuringNotice + 
-                Course + Function + Shift_Name + Gender, 
+logit1 <- glm(Attrition ~ ExperienceInAGS + Gender + MaritalState +
+              Shift + WorkLocation + JobRole + 
+              ExperienceType + QualAvgDuringNotice + Course + Last30DaysLeaveCount + 
+              TotalExtraHoursWorked + Function + TransportMode, 
               family=binomial, data = train); 
 summary(logit1)
 
@@ -302,5 +334,9 @@ as.numeric(performance(ROCRpred, "auc")@y.values)
 
 
 
-
-
+ ###################### Regression Diagnostics  ################
+############################################################
+library(car)
+outlierTest(logit1)
+# qqPlot(logit1, main="QQ Plot")
+car::vif(logit1)
