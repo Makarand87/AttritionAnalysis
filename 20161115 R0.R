@@ -53,15 +53,34 @@ str(dataset$ExperienceInAGS)
 
 
 
-# Toooooooooo Severe for the system
+
+numeric <- data.frame(x=dataset[c("ExperienceInAGS", "EmployeeAge", "LastReviewRating", "ProdAvgDuringNotice",
+             "QualAvgDuringNotice", "Last30DaysLeaveCount", "TotalExtraHoursWorked", "Distance",
+             "TravelTime", "Gender")], y= as.factor(dataset$Gender))
+
+
+
+str(numeric)
+vif_func(numeric)# Toooooooooo Severe for the system
 # fisher.test(dataset$Course, dataset$Availability_Filter,simulate.p.value=TRUE, B=1e7)
 
+library(caret)
 
 
+dummies <- predict(dummyVars(~ Gender, data = dataset), newdata = dataset)
+head(dummies, n = 3)
+
+
+
+
+binom <- data.frame(y=runif(1e5), x=runif(1e5), catVar=as.factor(sample(0:4,1e5,TRUE)))
+head(binom)
+c <- model.matrix(~ x + catVar,binom) 
+head(c)
 ### Strength of Association
 library(cramer)
 # Toooooooooo Severe for the system
-cramer.test(dataset$ExperienceInAGS, dataset$Attrition)
+# cramer.test(dataset$ExperienceInAGS, dataset$Attrition)
 
 library(vcd)
 assocstats(table(dataset$MaritalStatus, dataset$Attrition))
@@ -100,8 +119,8 @@ table(dataset$Course, dataset$Gender)
 
 cor(dataset$QualAvgDuringNotice, dataset$ProdAvgDuringNotice)
 
-
-
+library(GGally)
+ggpairs(dataset$Course, dataset$Gender)
 
 ########### 4. Logistic #####################
 ### Base Table Accuracy ###########
@@ -123,7 +142,7 @@ logit1 <- glm(Attrition ~ ExperienceInAGS + Gender + MaritalState +
               TotalExtraHoursWorked + Function + TransportMode, 
               family=binomial, data = train); 
 summary(logit1)
-
+# plot(logit1)
 
 ##
 cat(sprintf("Log likelihood: %.3f (%d df)\n",
@@ -340,3 +359,9 @@ library(car)
 outlierTest(logit1)
 # qqPlot(logit1, main="QQ Plot")
 car::vif(logit1)
+
+
+
+
+
+
