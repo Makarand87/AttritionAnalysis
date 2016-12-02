@@ -61,7 +61,7 @@ numeric <- data.frame(x=dataset[c("ExperienceInAGS", "EmployeeAge", "LastReviewR
 
 
 str(numeric)
-vif_func(numeric)# Toooooooooo Severe for the system
+vif_func(numeric) # Toooooooooo Severe for the system
 # fisher.test(dataset$Course, dataset$Availability_Filter,simulate.p.value=TRUE, B=1e7)
 
 library(caret)
