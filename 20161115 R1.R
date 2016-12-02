@@ -29,6 +29,8 @@ library(mice)
 # Distance, RptSpanofControl, LastButOneReviewRating, 
 
 
+
+
 simple <- sampledata2[c("MaritalStatus", "Course", "TransportMode", "EngagementIndex")]
 summary(simple)
 set.seed(144)
@@ -38,6 +40,7 @@ sampledata2$MaritalStatus = imputed$MaritalStatus
 sampledata2$Course = imputed$Course
 sampledata2$TransportMode = imputed$TransportMode
 sampledata2$EngagementIndex = imputed$EngagementIndex
+
 
 
 summary(sampledata2[c("MaritalStatus", "Course", "TransportMode", "EngagementIndex")])
@@ -304,4 +307,24 @@ significant1 <- sampledata2[c("QualAvgBeforeNotice", "ProdAvgDuringNotice", "Pro
                                  "PermenantAddressPincode", "CurrentAddressPincode")] 
 str(significant1)
 summary(significant1)
-source()
+source("vif_func.R")
+vif_func(sampledata2)
+
+
+
+
+
+###################### ###########################
+
+
+logit1 <- glm(Availability_Filter ~ QualAvgBeforeNotice + ProdAvgDuringNotice + ProdAvgBeforeNotice + 
+                ExperienceInAGS + WorkFacility + Last30DaysLeaveCount + TravelTime + EngagementIndex + JobRole +
+                QualAvgDuringNotice + Function + WorkLocation + Shift_Name + PermenantAddressPincode + CurrentAddressPincode, data=sampledata2, family = "binomial" )
+summary(logit1)
+cor(logit1$y, logit1$fitted.values)
+# library(car)
+# car::vif(logit1) 
+# ld_var <- attributes(alias(logit1)$Complete)$dimnames[[1]]
+# summary(ld_var)
+
+
