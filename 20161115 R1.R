@@ -8,7 +8,7 @@ dataset <- AttritionData
 nobs <- nrow(dataset); nobs
 str(dataset)
 summary(dataset)
-
+sd(dataset)
 
 
 
@@ -48,6 +48,10 @@ dataset2 <- dataset[c("EmployeeCode", "ExperienceInAGS", "EmployeeAge", "Gender"
                       "JobRole", "ExperienceType", "ProdAvgDuringNotice", "QualAvgDuringNotice", "Course", "Last30DaysLeaveCount",
                       "TotalExtraHoursWorked", "Function", "Shift", "TransportMode","EngagementIndex", "Availability_Filter", "Attrition", "Available")]
 
+
+
+################ Imputation ############
+
 library(mice) # Multivariate Imputation by Chained Equations
 simple <- dataset2[c("MaritalStatus", "Course", "TransportMode", "EngagementIndex", "ProdAvgDuringNotice", "QualAvgDuringNotice")]
 summary(simple)
@@ -63,9 +67,15 @@ dataset2$QualAvgDuringNotice =imputed$ProdAvgDuringNotice
 
 write.csv(dataset2, file="C:/Users/makarand.ghule/Documents/AttritionAnalysis/Imputed Data.csv", row.names=FALSE)
 dataset2_2 <- read.csv("Imputed Data.csv")
+
+#######################  Engagement Index ###########
+dataset2_2$EngagementIndex <- factor(dataset2_2$EngagementIndex, levels = c("Green", "Amber", "Red"))
 summary(dataset2_2)
+str(dataset2_2)
+sapply(dataset2_2, sd)
 
 
+#######################  
 
 # Randomly split data
 library(caTools)
@@ -73,17 +83,8 @@ set.seed(88)
 split = sample.split(dataset2_2$Availability_Filter, SplitRatio = 0.75)
 training=subset(dataset2_2, split==TRUE); nrow(training)
 testing = subset(dataset2_2, split==FALSE); nrow(testing)
-
-
-table(training$WorkLocation, training$Availability_Filter)
-
-dataset3 <- rbind(training, testing)
-
 summary(training)
-tapply(training$ExperienceInAGS, training$Availability_Filter, mean)
-tapply(training$EmployeeAge, training$Availability_Filter, mean)
-table(training$Availability_Filter, training$Gender)
-
+dataset3 <- rbind(training, testing)
 
 
 ################### 3. Inintal Analyis ##########
@@ -96,32 +97,34 @@ table(dataset2_2$MaritalStatus, dataset2_2$Availability_Filter)
 MarriedLeft <- 168/(168+280); MarriedLeft
 UnmarriedLeft <- 1116/(1316+1116); round(UnmarriedLeft,2)
 table(dataset2_2$Course, dataset2_2$Availability_Filter)
+table(training$WorkLocation, training$Availability_Filter)
+tapply(training$ExperienceInAGS, training$Availability_Filter, mean)
+tapply(training$EmployeeAge, training$Availability_Filter, mean)
+table(training$Availability_Filter, training$Gender)
 
 
+
+
+########### co-relation plot ###########
 nums <- sapply(dataset2_2, is.numeric)
 numdataset2 <- dataset2_2[,nums]
 
 cor(numdataset2)
 
 
-library(corrplot)
-# Correlations work for numeric variables only.
 
 cor <- cor(numdataset2, use="pairwise", method="pearson")
 summary(cor)
-# Order the correlations by their strength.
 
+# Order the correlations by their strength.
 ord <- order(cor[1,])
-str(ord)
 ccor <- cor[ord, ord]
 print(ccor)
-# Display the actual correlations.
-
-print(crs$cor)
 
 # Graphically display the correlations.
+library(corrplot)
 
-corrplot(crs$cor, mar=c(0,0,1,0))
+corrplot(cor, mar=c(0,0,1,0))
 title(main="Correlation Imputed Data.csv using Pearson",
       sub=paste("Rattle", format(Sys.time(), "%Y-%b-%d %H:%M:%S"), Sys.info()["user"]))
 
@@ -230,3 +233,107 @@ install.packages("ResourceSelection")
 library(ResourceSelection)
 
 hoslem.test(training$Available, fitted(logit1))
+
+
+
+
+################ ULCA ##############
+
+install.packages("packagename")
+install.packages("aod")
+library(aod)
+library(ggplot2)
+library(Rcpp)
+
+
+## CIs using profiled log-likelihood
+cbind(exp(logit1$coefficients), exp(confint(logit1)))
+#  Wald confidence limits
+cbind(exp(logit1$coefficients), exp(confint.default(logit1)))
+
+# overall effect
+wald.test(b = coef(logit1), Sigma = vcov(logit1), Terms = 6:7) #Work Location
+
+wald.test(b = coef(logit1), Sigma = vcov(logit1), Terms = 8:9) # Job Role
+
+wald.test(b = coef(logit1), Sigma = vcov(logit1), Terms = 10:11) # Experience Type
+
+wald.test(b = coef(logit1), Sigma = vcov(logit1), Terms = 13:24) # Courses
+
+wald.test(b = coef(logit1), Sigma = vcov(logit1), Terms = 28:37) # Shift
+
+wald.test(b = coef(logit1), Sigma = vcov(logit1), Terms = 38:42) # Transport Mode
+
+wald.test(b = coef(logit1), Sigma = vcov(logit1), Terms = 43:44) # Engagement Index
+
+
+# hypotheses about the differences in the coefficients for the different levels of rank
+l <- cbind(0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0  )
+wald.test(b = coef(logit1), Sigma = vcov(logit1), L = l)
+
+
+
+
+#### probabilities plot ####
+dev.off()
+
+
+newdata3 <- cbind(dataset3, predict(logit1, newdata=dataset3, type="link", se=TRUE))
+newdata3 <- within(newdata3, {
+              PredictedProb  <- plogis(fit)
+              LL <- plogis(fit - (1.96*se.fit))
+              UL <- plogis(fit + (1.96*se.fit))
+})
+head(newdata3)
+library(ggplot2)
+
+
+##  ExperienceinAGS by Work Location
+ggplot(newdata3, aes(x=ExperienceInAGS, y=PredictedProb)) + 
+  geom_ribbon(aes(ymin=LL, ymax=UL, fill=WorkLocation), alpha=0.2) +
+  geom_line(aes(color=WorkLocation), size=1)
+
+# ProdAvgDuring Notice by WorkLocation
+ggplot(newdata3, aes(x = ProdAvgDuringNotice, y = PredictedProb)) +
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = WorkLocation), alpha = .2) +
+  geom_line(aes(colour = WorkLocation), size=1)
+
+# ProdAvgDuring Notice by Gender
+ggplot(newdata3, aes(x = ProdAvgDuringNotice, y = PredictedProb)) +
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = Gender), alpha = .2) +
+  geom_line(aes(colour = Gender), size=1)
+
+# Age Vs Gender
+ggplot(newdata3, aes(x = EmployeeAge, y = PredictedProb)) +
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = Gender), alpha = .2) +
+  geom_line(aes(colour = Gender), size=1)
+
+# Age By Gender
+ggplot(newdata3, aes(x = EmployeeAge, y = PredictedProb)) +
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = MaritalStatus), alpha = .2) +
+  geom_line(aes(colour = MaritalStatus), size=1)
+
+# ExperinenceinAGS by WorkLocation
+ggplot(newdata3, aes(x=ExperienceInAGS, y=PredictedProb)) + 
+  geom_ribbon(aes(ymin=LL, ymax=UL, fill=WorkLocation), alpha=0.2) + 
+  geom_line(aes(colour=WorkLocation), size=1)
+
+summary(logit1)
+pchisq(3087.0-1341.5, (2234-2191))
+pchisq(1341.5, 2191)
+anova(logit1, test="Chisq")
+drop1(logit1, test="Chisq")
+
+
+
+
+
+# The Residuals vs Fitted plot can help you see, for example, if there are curvilinear trends that you missed. But the fit of a logistic regression is curvilinear by nature, so you can have odd looking trends in the residuals with nothing amiss.
+plot(logit1, which=1)
+# The Normal Q-Q plot helps you detect if your residuals are normally distributed. But the deviance residuals don't have to be normally distributed for the model to be valid, so the normality / non-normality of the residuals doesn't necessarily tell you anything.
+plot(logit1, which=2)
+# The Scale-Location plot can help you identify heteroscedasticity. But logistic regression models are pretty much heteroscedastic by nature.
+plot(logit1, which=3)
+# The Residuals vs Leverage can help you identify possible outliers. But outliers in logistic regression don't necessarily manifest in the same way as in linear regression, so this plot may or may not be helpful in identifying them.
+plot(logit1, which=4)
+
