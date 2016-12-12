@@ -68,6 +68,16 @@ dataset2$QualAvgDuringNotice =imputed$ProdAvgDuringNotice
 write.csv(dataset2, file="C:/Users/makarand.ghule/Documents/AttritionAnalysis/Imputed Data.csv", row.names=FALSE)
 dataset2_2 <- read.csv("Imputed Data.csv")
 
+continuous_vars <- c("ExperienceInAGS", "EmployeeAge", "ProdAvgDuringNotice", 
+                            "QualAvgDuringNotice", "Last30DaysLeaveCount", 
+                            "TotalExtraHoursWorked")
+
+
+factor_vars <- c("Gender", "MaritalStatus", "WorkLocation", "JobRole", 
+                           "ExperienceType", "Course", "Function", "Shift", 
+                           "TransportMode", "EngagementIndex")
+
+
 #######################  Engagement Index ###########
 dataset2_2$EngagementIndex <- factor(dataset2_2$EngagementIndex, levels = c("Green", "Amber", "Red"))
 summary(dataset2_2)
@@ -89,6 +99,34 @@ dataset3 <- rbind(training, testing)
 
 ################### 3. Inintal Analyis ##########
 
+
+## Information Value
+# install.packages("smbinning")
+library(smbinning)
+
+iv_df <- data.frame(VARS=c(factor_vars, continuous_vars), IV=numeric(16))
+
+
+for (factor_var in factor_vars) {
+  smb <- smbinning.factor(dataset2_2, y="Attrition", x=factor_var)
+  if (class(smb) != "character") {
+    iv_df[iv_df$VARS == factor_var, "IV"] <- smb$iv
+  }
+}
+
+for(continuous_var in continuous_vars){
+  smb <- smbinning(dataset2_2, y="Attrition", x=continuous_var) 
+  if(class(smb) != "character"){ 
+    iv_df[iv_df$VARS == continuous_var, "IV"] <- smb$iv
+  }
+}
+iv_df <- iv_df[order(-iv_df$IV), ]
+iv_df
+
+
+
+
+############
 tapply(dataset2_2$Attrition, dataset2_2$WorkLocation, sum)
 tapply(dataset2_2$Available, dataset2_2$WorkLocation, sum)
 tapply(dataset2_2$Last30DaysLeaveCount, dataset2_2$Availability_Filter, mean)
@@ -106,12 +144,11 @@ table(training$Availability_Filter, training$Gender)
 
 
 ########### co-relation plot ###########
-nums <- sapply(dataset2_2, is.numeric)
-numdataset2 <- dataset2_2[,nums]
 
+str(numdataset2)
 cor(numdataset2)
 
-
+str(factor_var)
 
 cor <- cor(numdataset2, use="pairwise", method="pearson")
 summary(cor)
@@ -326,14 +363,15 @@ drop1(logit1, test="Chisq")
 
 
 
+## over / underdispersion  ###
+install.packages("AER")
+library(AER)
+deviance(logit1)/logit1$df.residual
+
+# influential and leverage points,
+library(car)
+influencePlot(logit1, col = c(1, 2), identify.cex=par("cex"), identify.col=par("col"))
+# labels = names(rstud),
 
 
-# The Residuals vs Fitted plot can help you see, for example, if there are curvilinear trends that you missed. But the fit of a logistic regression is curvilinear by nature, so you can have odd looking trends in the residuals with nothing amiss.
-plot(logit1, which=1)
-# The Normal Q-Q plot helps you detect if your residuals are normally distributed. But the deviance residuals don't have to be normally distributed for the model to be valid, so the normality / non-normality of the residuals doesn't necessarily tell you anything.
-plot(logit1, which=2)
-# The Scale-Location plot can help you identify heteroscedasticity. But logistic regression models are pretty much heteroscedastic by nature.
-plot(logit1, which=3)
-# The Residuals vs Leverage can help you identify possible outliers. But outliers in logistic regression don't necessarily manifest in the same way as in linear regression, so this plot may or may not be helpful in identifying them.
-plot(logit1, which=4)
-
+# zero inflation
