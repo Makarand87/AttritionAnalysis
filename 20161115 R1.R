@@ -1,6 +1,6 @@
 ############# 1.INPUT ############# 
 
-setwd("C:/Users/makarand.ghule/Documents/AttritionAnalysis")
+setwd("C:/Users/makarand.ghule/Documents/AttritionAnalysis/AttritionAnalysis")
 AttritionData <- read.csv("20161116ARFollowUp.csv", na.strings = c("NA", ""))
 
 dataset <- AttritionData
@@ -66,6 +66,9 @@ dataset2$ProdAvgDuringNotice =imputed$ProdAvgDuringNotice
 dataset2$QualAvgDuringNotice =imputed$ProdAvgDuringNotice
 
 write.csv(dataset2, file="C:/Users/makarand.ghule/Documents/AttritionAnalysis/Imputed Data.csv", row.names=FALSE)
+
+
+######## Imputed Dataset #########
 dataset2_2 <- read.csv("Imputed Data.csv")
 
 continuous_vars <- c("ExperienceInAGS", "EmployeeAge", "ProdAvgDuringNotice", 
@@ -79,7 +82,7 @@ factor_vars <- c("Gender", "MaritalStatus", "WorkLocation", "JobRole",
 
 
 #######################  Engagement Index ###########
-dataset2_2$EngagementIndex <- factor(dataset2_2$EngagementIndex, levels = c("Green", "Amber", "Red"))
+# dataset2_2$EngagementIndex <- factor(dataset2_2$EngagementIndex, levels = c("Green", "Amber", "Red"))
 summary(dataset2_2)
 str(dataset2_2)
 sapply(dataset2_2, sd)
@@ -144,6 +147,8 @@ table(training$Availability_Filter, training$Gender)
 
 
 ########### co-relation plot ###########
+nums <- sapply(dataset2_2, is.numeric)
+numdataset2 <- dataset2_2[,nums]
 
 str(numdataset2)
 cor(numdataset2)
@@ -159,6 +164,7 @@ ccor <- cor[ord, ord]
 print(ccor)
 
 # Graphically display the correlations.
+# install.packages("corrplot")
 library(corrplot)
 
 corrplot(cor, mar=c(0,0,1,0))
@@ -168,18 +174,19 @@ title(main="Correlation Imputed Data.csv using Pearson",
 
 
 
-################# 4. Model #######################
+################# 4. Model 1 (all IMP) #######################
+
+#testing model without Last30DaysLeaveCount accuracy on all data
+logit1 <- glm(Availability_Filter ~  EngagementIndex  
+              + ExperienceInAGS + TotalExtraHoursWorked + ProdAvgDuringNotice + Function 
+              + JobRole + ExperienceType  + TransportMode + WorkLocation + EmployeeAge 
+              + MaritalStatus + Gender + Course + Shift 
+              , data=training, family=binomial(link="logit"))
 
 
-logit1 <- glm(Availability_Filter ~ ExperienceInAGS + EmployeeAge + Gender + MaritalStatus + WorkLocation + 
-                JobRole + ExperienceType + ProdAvgDuringNotice + Course + Last30DaysLeaveCount + 
-                TotalExtraHoursWorked + Function + Shift + TransportMode + EngagementIndex, 
-              data=training, family=binomial)
-
-
+cor(logit1$y, logit1$fitted.values)
 
 summary(logit1)
-cor(logit1$y, logit1$fitted.values)
 
 
 
@@ -195,34 +202,39 @@ vif(logit1)
 predTrain <- predict(logit1, type="response")
 tapply(predTrain, training$Availability_Filter, mean)
 
-# Confusion matrix for threshold of 0.5
-table(training$Availability_Filter, predTrain > 0.5)
-accTrain1 <- (1084+877)/(1084+113+161+877); accTrain1
-senTrain1 <- 877/(877+161); senTrain1
-speTrain1 <- 1084/(1084+113); speTrain1
-
-
 library(ROCR)
-
+library(InformationValue)
 PredTrainROC1 = prediction(predTrain,  training$Availability_Filter)
 PerfTrainROC1 = performance(PredTrainROC1, "tpr", "fpr")
 plot(PerfTrainROC1, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.2,1.7), main="ROC Plot")
 as.numeric(performance(PredTrainROC1, "auc")@y.values)
 
 
+# Confusion matrix for threshold of 0.5
+table(training$Availability_Filter, predTrain > 0.5)
+accTrain1 <- (1084+877)/(1084+113+161+877); accTrain1
+senTrain1 <- 877/(877+161); senTrain1
+speTrain1 <- 1084/(1084+113); speTrain1
+1 - misClassError(training$Attrition, predTrain)
+
+
+# install.packages("InformationValue")
+library(InformationValue)
+optimalCutoff(training$Availability_Filter, predTrain)
 ########## 5.2 Predict on test data ##############
 predTest1 <- predict(logit1, newdata=testing, type="response")
 tapply(predTest1, testing$Availability_Filter, mean, na.rm=TRUE)
+optimalCutoff(testing$Availability_Filter, predTest1)
 
 # Confusion matrix for threshold of 0.5
 table(testing$Availability_Filter, predTest1 > 0.5)
 accTest1 <- (304+186)/(304+25+28+186); accTest1
 senTest1 <- 186/(186+28); senTest1
 speTest1 <- 304/(304+25); speTest1
+misClassError(testing$Attrition, predTest1 , 0.5)
 
 
-
-PredTestROC1 = prediction(predTest, testing$Availability_Filter)
+PredTestROC1 = prediction(predTest1, testing$Availability_Filter)
 PerfTestROC1 = performance(PredTestROC1, "tpr", "fpr")
 plot(PerfTestROC1, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.2,1.7), main="ROC Plot")
 as.numeric(performance(PredTestROC1, "auc")@y.values)
@@ -231,13 +243,29 @@ as.numeric(performance(PredTestROC1, "auc")@y.values)
 
 ##################### 5.3 prediciton on all data ####################
 predAll1 <- predict(logit1, newdata = dataset3, type="response")
+# predAll2 <- plogis(predict(logit1, dataset3, type="response"))  # predicted scores
+summary(predAll1)
 tapply(predAll1, dataset3$Availability_Filter, mean, na.rm=TRUE)
+optimalCutoff(dataset3, predAll1)
 
 # Confusion matrix for threshold of 0.5
 table(dataset3$Availability_Filter, predAll1> 0.5)
 accAll1 <- (1448+1170)/(1448+148+214+1170); accAll1
 senAll1 <- 1170/(1170+214); senAll1
 speAll1 <- 1448/(1448+148); speAll1
+1- misClassError(dataset3$Attrition, predAll1)
+sensitivity(dataset3$Attrition, predAll1)
+specificity(dataset3$Attrition, predAll1)
+# Concordance/Discordance
+
+Concordance(dataset3$Attrition, predAll1)
+Concordance(training$Attrition, predTrain)
+Concordance(testing$Attrition, predTest1)
+
+
+plotROC(dataset3$Attrition, predAll1,Show.labels = TRUE, returnSensitivityMat = TRUE)
+
+
 
 PredAllROC1 <- prediction(predAll1, dataset3$Availability_Filter)
 PerfAllROC1 <- performance(PredAllROC1, "tpr", "fpr")
@@ -374,4 +402,4 @@ influencePlot(logit1, col = c(1, 2), identify.cex=par("cex"), identify.col=par("
 # labels = names(rstud),
 
 
-# zero inflation
+
